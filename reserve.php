@@ -16,14 +16,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $status = 'pending';
 
     if (isset($_POST['check_availability']) || isset($_POST['reserve'])) {
-        // Get current date
         $current_date = date("Y-m-d");
 
-        // Prevent booking past dates
         if ($reservation_date < $current_date) {
             $availability_message = "❌ Cannot book a past date.";
         } else {
-            // Check if the user has already booked for the selected date and time
             $check_user_sql = "SELECT COUNT(*) FROM reservations WHERE user_id = ? AND reservation_date = ? AND time_slot = ?";
             $stmt = $conn->prepare($check_user_sql);
             $stmt->bind_param("iss", $user_id, $reservation_date, $time_slot);
@@ -35,7 +32,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if ($user_reservation > 0) {
                 $availability_message = "❌ You have already booked this time slot on this date.";
             } else {
-                // Check the number of users who have already booked for the same date and time
                 $check_slot_sql = "SELECT COUNT(*) FROM reservations WHERE reservation_date = ? AND time_slot = ?";
                 $stmt = $conn->prepare($check_slot_sql);
                 $stmt->bind_param("ss", $reservation_date, $time_slot);
@@ -44,38 +40,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $stmt->fetch();
                 $stmt->close();
 
-                // Check if the time slot is available
                 if ($existing_reservations >= 5) {
                     $availability_message = "❌ This time slot is fully booked. Please choose another time.";
                 } else {
                     $availability_message = "✅ This time slot is available. You can proceed with the reservation.";
 
-                    // If the user clicks "Reserve" and the slot is available, proceed with reservation
                     if (isset($_POST['reserve'])) {
-                        // Prevent booking past dates
-                        if ($reservation_date < $current_date) {
-                            die("❌ Cannot book a past date.");
-                        }
-
-                        // Restrict booking within the next 2 months
                         $max_date = date("Y-m-d", strtotime("+2 months"));
                         if ($reservation_date > $max_date) {
                             die("❌ You can only book within the next 2 months.");
                         }
 
-                        // Insert reservation
                         $insert_sql = "INSERT INTO reservations (user_id, reservation_date, time_slot, status) VALUES (?, ?, ?, ?)";
                         $stmt = $conn->prepare($insert_sql);
                         $stmt->bind_param("isss", $user_id, $reservation_date, $time_slot, $status);
 
                         if ($stmt->execute()) {
-                            echo "<p style='color: green;'>✅ Reservation successful! Redirecting to dashboard...</p>";
-                            header("Refresh: 2; URL=dashboard.php"); // Redirect after 2 seconds
-                            exit(); // Ensure script execution stops after redirection
+                            echo "<p class='text-success text-center'>✅ Reservation successful! Redirecting...</p>";
+                            header("Refresh: 2; URL=dashboard.php");
+                            exit();
                         } else {
                             $availability_message = "❌ Error: " . $stmt->error;
                         }
-
                         $stmt->close();
                     }
                 }
@@ -83,7 +69,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
     }
 }
-
 $conn->close();
 ?>
 
@@ -93,31 +78,43 @@ $conn->close();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Make a Reservation</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" />
 </head>
-<body>
-    <h2>Make a Reservation</h2>
+<body class="bg-light d-flex justify-content-center align-items-center min-vh-100">
 
-    <form method="post" action="reserve.php">
-        <label for="reservation_date">Date:</label>
-        <input type="date" id="reservation_date" name="reservation_date" value="<?= htmlspecialchars($reservation_date) ?>" required><br>
+    <div class="card shadow-lg rounded p-4" style="width: 400px;">
+        <h2 class="text-center mb-4 text-black">Make a Reservation</h2>
 
-        <label for="time_slot">Time Slot:</label>
-        <select id="time_slot" name="time_slot">
-            <option value="08:00:00" <?= ($time_slot == "08:00:00") ? 'selected' : '' ?>>08:00 AM - 10:00 AM</option>
-            <option value="10:00:00" <?= ($time_slot == "10:00:00") ? 'selected' : '' ?>>10:00 AM - 12:00 PM</option>
-            <option value="13:00:00" <?= ($time_slot == "13:00:00") ? 'selected' : '' ?>>01:00 PM - 03:00 PM</option>
-            <option value="15:00:00" <?= ($time_slot == "15:00:00") ? 'selected' : '' ?>>03:00 PM - 05:00 PM</option>
-        </select><br>
+        <form method="post" action="reserve.php">
+            <div class="mb-3">
+                <label for="reservation_date" class="form-label">Date:</label>
+                <input type="date" name="reservation_date" id="reservation_date" value="<?= htmlspecialchars($reservation_date) ?>" required class="form-control" />
+            </div>
 
-        <button type="submit" name="check_availability">Check Availability</button>
-        <?php if ($availability_message == "✅ This time slot is available. You can proceed with the reservation.") { ?>
-            <button type="submit" name="reserve">Reserve</button>
+            <div class="mb-3">
+                <label for="time_slot" class="form-label">Time Slot:</label>
+                <select name="time_slot" id="time_slot" class="form-select">
+                    <option value="08:00:00" <?= ($time_slot == "08:00:00") ? 'selected' : '' ?>>08:00 AM - 10:00 AM</option>
+                    <option value="10:00:00" <?= ($time_slot == "10:00:00") ? 'selected' : '' ?>>10:00 AM - 12:00 PM</option>
+                    <option value="13:00:00" <?= ($time_slot == "13:00:00") ? 'selected' : '' ?>>01:00 PM - 03:00 PM</option>
+                    <option value="15:00:00" <?= ($time_slot == "15:00:00") ? 'selected' : '' ?>>03:00 PM - 05:00 PM</option>
+                </select>
+            </div>
+
+            <button type="submit" name="check_availability" class="btn btn-primary w-100">Check Availability</button>
+
+            <?php if ($availability_message == "✅ This time slot is available. You can proceed with the reservation.") { ?>
+                <button type="submit" name="reserve" class="btn btn-success w-100 mt-3">Reserve</button>
+            <?php } ?>
+        </form>
+
+        <?php if ($availability_message) { ?>
+            <p class="text-center mt-3 text-muted"><?= $availability_message ?></p>
         <?php } ?>
-    </form>
 
-    <?php if ($availability_message) { echo "<p>$availability_message</p>"; } ?>
+        <a href="dashboard.php" class="btn btn-secondary w-100 mt-3">Back</a>
+    </div>
 
-    <br>
-    <a href="dashboard.php">Back to Dashboard</a>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
